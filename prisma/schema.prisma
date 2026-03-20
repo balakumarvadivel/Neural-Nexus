@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum Role {
+  WORKER
+  ADMIN
+}
+
+enum ProtectionStatus {
+  INACTIVE
+  ACTIVE
+  RISK_ZONE
+  DELAYED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSED
+  DELAYED
+  OVERRIDDEN
+}
+
+enum FraudSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id                 String           @id @default(cuid())
+  name               String
+  email              String?          @unique
+  phone              String?          @unique
+  passwordHash       String
+  role               Role             @default(WORKER)
+  city               String?
+  weeklyEarningsBase Float            @default(620)
+  isFlagged          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  subscriptions      Subscription[]
+  payouts            Payout[]
+  riskScores         RiskScore[]
+  fraudFlags         FraudFlag[]
+}
+
+model Subscription {
+  id             String           @id @default(cuid())
+  userId         String
+  city           String
+  premium        Float
+  weeklyCoverage Float
+  status         ProtectionStatus @default(ACTIVE)
+  startedAt      DateTime         @default(now())
+  expiresAt      DateTime
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payout {
+  id             String       @id @default(cuid())
+  userId         String
+  subscriptionId String?
+  amount         Float
+  reason         String
+  status         PayoutStatus @default(PENDING)
+  priorityScore  Int          @default(50)
+  processedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EnvironmentData {
+  id           String   @id @default(cuid())
+  city         String
+  rainfallMm   Float
+  temperatureC Float
+  aqi          Int
+  recordedAt   DateTime @default(now())
+  simulatedBy  String?
+  source       String   @default("simulation")
+}
+
+model RiskScore {
+  id                 String   @id @default(cuid())
+  userId             String
+  trustScore         Int
+  gpsConsistency     Int
+  activityPattern    Int
+  sessionConsistency Int
+  payoutDelayDays    Int      @default(0)
+  needsReview        Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FraudFlag {
+  id        String         @id @default(cuid())
+  userId    String
+  severity  FraudSeverity
+  reason    String
+  metadata  Json?
+  resolved  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
